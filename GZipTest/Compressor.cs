@@ -14,7 +14,7 @@ namespace GZipTest
         private byte[][] _outputBuffer;
 
         private EventWaitHandle _waitHandle;    // synchronization event
-        private int _syncCounter;               // synchronization counter
+        private int _syncCounter = 0;           // synchronization counter
         public void ResetSyncCounter()          // Resets _syncCounter;
         {
             _syncCounter = 0;

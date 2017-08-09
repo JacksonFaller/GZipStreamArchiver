@@ -63,8 +63,6 @@ namespace GZipTest
                         while (inputStream.Position < inputStream.Length)
                         {
                             _compressor.ResetSyncCounter();
-                            _waitHandle.Reset();
-
                             ReadAndInvokeCompress(inputStream);
                             _waitHandle.WaitOne();
                             Write(outputStream);
@@ -72,7 +70,7 @@ namespace GZipTest
                     }
                     else // target opeartion - decompress
                     {
-                        _compressor.ResetSyncCounter();
+                        ValidateArchive(inputStream);
                         ReadAndInvokeDecompress(inputStream, outputStream);
                     }
                 }
@@ -113,75 +111,87 @@ namespace GZipTest
         /// <param name="outputStream">target file stream</param>
         void ReadAndInvokeDecompress(FileStream inputStream, FileStream outputStream)
         {
-            int searchPos, checkSum;
-            int blockPosition = 0, blockCount = 0, offset = 3, additionalBytes = 375;
+            int searchPos, checkSum, bytesReaded, blockPosition;
+            int blockCount = 0, offset = 3, additionalBytes = 375;
             byte[] dataBuffer = new byte[BufferSize + additionalBytes];
 
-            int bytesReaded = inputStream.Read(dataBuffer, 0, dataBuffer.Length);
-
-            // Check is this file a GZip archive
-            if (dataBuffer[0] == 0x1f && dataBuffer[1] == 0x8b && dataBuffer[2] == 0x08)
+            for (;;)
             {
-                for (;;)
+                bytesReaded = inputStream.Read(dataBuffer, 0, dataBuffer.Length);
+                blockPosition = 0;
+                
+                for (searchPos = offset; searchPos < bytesReaded - 2; searchPos++)
                 {
-                    for (searchPos = offset; searchPos < bytesReaded - 2; searchPos++)
+                    // 0x1f and  0x8b is "Magic numbers" that describe / identify GZIP compression
+                    // 0x08 - compression method (Deflate)
+                    if (dataBuffer[searchPos] == 0x1f && dataBuffer[searchPos + 1] == 0x8b && dataBuffer[searchPos + 2] == 0x08)
                     {
-                        if (dataBuffer[searchPos] == 0x1f && dataBuffer[searchPos + 1] == 0x8b && dataBuffer[searchPos + 2] == 0x08)
+                        // input size of uncompressed data (4 bytes)
+                        checkSum = BitConverter.ToInt32(dataBuffer, searchPos - 4);
+                        if (checkSum == BufferSize) 
                         {
-                            checkSum = BitConverter.ToInt32(dataBuffer, searchPos - 4);
-                            if (checkSum == BufferSize)
-                            {
-                                _inputBuffer[blockCount] = new byte[searchPos - blockPosition];
-                                Buffer.BlockCopy(dataBuffer, blockPosition, _inputBuffer[blockCount], 0, searchPos - blockPosition);
-                                blockPosition = searchPos;
-                                _outputBuffer[blockCount] = new byte[BufferSize];
-                                
-                                new Thread(_compressor.DecompressBlock).Start(blockCount); // Invoke Decompress method in a new thread
-                                blockCount++;
+                            _inputBuffer[blockCount] = new byte[searchPos - blockPosition];
+                            Buffer.BlockCopy(dataBuffer, blockPosition, _inputBuffer[blockCount], 0, searchPos - blockPosition);
+                            blockPosition = searchPos;
+                            _outputBuffer[blockCount] = new byte[BufferSize];
+                            
+                            new Thread(_compressor.DecompressBlock).Start(blockCount); // Invoke Decompress method in a new thread
+                            blockCount++;
 
-                                if (blockCount == ThreadNumber) // Check that we have maximum number of theads invoked
-                                {
-                                    _waitHandle.WaitOne();
-                                    Write(outputStream);
-                                    _compressor.ResetSyncCounter();
-                                    blockCount = 0;
-                                }
+                            if (blockCount == ThreadNumber) // Check that we have maximum number of theads invoked
+                            {
+                                _waitHandle.WaitOne();
+                                Write(outputStream);
+                                _compressor.ResetSyncCounter();
+                                blockCount = 0;
                             }
                         }
                     }
-                    // All data was readed from stream, copy last block to the buffer, decompress it
-                    // and write the rest decompressed blocks to the file
-                    if (bytesReaded < dataBuffer.Length) 
-                    {
-                        _inputBuffer[blockCount] = new byte[bytesReaded - blockPosition];
-                        Buffer.BlockCopy(dataBuffer, blockPosition, _inputBuffer[blockCount], 0, bytesReaded - blockPosition);
-
-                        checkSum = BitConverter.ToInt32(dataBuffer, bytesReaded - 4);
-                        _outputBuffer[blockCount] = new byte[checkSum];
-
-                        ThreadCount = blockCount + 1;
-                        new Thread(_compressor.DecompressBlock).Start(blockCount); // Invoke decompress method in new thread
-                        _waitHandle.WaitOne(); // Waiting for all threads to complete
-                        Write(outputStream);
-                        break;
-                    }
-                    offset = searchPos - blockPosition + 1; 
-                    inputStream.Position = inputStream.Position - (bytesReaded - blockPosition);
-                    blockPosition = 0;
-                    bytesReaded = inputStream.Read(dataBuffer, 0, dataBuffer.Length);
                 }
+                // All data was readed from stream, copy last block to the buffer, decompress it
+                // and write the rest decompressed blocks to the file
+                if (bytesReaded < dataBuffer.Length) 
+                {
+                    _inputBuffer[blockCount] = new byte[bytesReaded - blockPosition];
+                    Buffer.BlockCopy(dataBuffer, blockPosition, _inputBuffer[blockCount], 0, bytesReaded - blockPosition);
+
+                    checkSum = BitConverter.ToInt32(dataBuffer, bytesReaded - 4);
+                    _outputBuffer[blockCount] = new byte[checkSum];
+
+                    ThreadCount = blockCount + 1;
+                    new Thread(_compressor.DecompressBlock).Start(blockCount); // Invoke decompress method in new thread
+                    _waitHandle.WaitOne(); // Waiting for all threads to complete
+                    Write(outputStream);
+                    break;
+                }
+                offset = searchPos - blockPosition + 1; 
+                inputStream.Position = inputStream.Position - (bytesReaded - blockPosition);
             }
-            else
+        }
+
+        /// <summary>
+        /// Check is this file a GZip archive
+        /// </summary>
+        /// <param name="inputStream">source file stream</param>
+        void ValidateArchive(FileStream inputStream)
+        {
+            byte[] dataBuffer = new byte[3];
+            inputStream.Read(dataBuffer, 0, dataBuffer.Length);
+
+            // 0x1f and  0x8b is "Magic numbers" that describe / identify GZIP compression
+            // 0x08 - compression method (Deflate)
+            if (dataBuffer[0] != 0x1f || dataBuffer[1] != 0x8b || dataBuffer[2] != 0x08)
             {
                 throw new InvalidFormatException();
             }
+            inputStream.Position = 0; // Reset the stream position
         }
 
         /// <summary>
         /// Write compressed / decompressed data from the buffer to the target file
         /// </summary>
         /// <param name="outputStream">target file stream to write</param>
-        public void Write(FileStream outputStream)
+        void Write(FileStream outputStream)
         {
             for (int i = 0; i < ThreadCount; i++)
             {
