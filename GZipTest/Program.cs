@@ -53,13 +53,13 @@ namespace GZipTest
             }
             else
             {
-                if (args[0].ToLower() == "compress")
+                if (args[0].Equals(Controller.Operation.Compress.ToString(), StringComparison.OrdinalIgnoreCase))
                 {
                     return new Controller(Controller.Operation.Compress, args[1], args[2]);
                 }
                 else
                 {
-                    if (args[0].ToLower() == "decompress")
+                    if (args[0].Equals(Controller.Operation.Decompress.ToString(), StringComparison.OrdinalIgnoreCase))
                     {
                         return new Controller(Controller.Operation.Decompress, args[1], args[2]);
                     }

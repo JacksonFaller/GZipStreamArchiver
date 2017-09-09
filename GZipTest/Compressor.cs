@@ -8,14 +8,15 @@ namespace GZipTest
     /// <summary>
     /// Contains compress / decompress file methods
     /// </summary>
-    public class Compressor
+    public class Compressor : ICompressor
     {
         private byte[][] _inputBuffer;
         private byte[][] _outputBuffer;
 
         private EventWaitHandle _waitHandle;    // synchronization event
         private int _syncCounter = 0;           // synchronization counter
-        public void ResetSyncCounter()          // Resets _syncCounter;
+
+        private void ResetSyncCounter()          // Resets _syncCounter;
         {
             _syncCounter = 0;
         }
@@ -23,11 +24,13 @@ namespace GZipTest
         /// <param name="waitHandle">reference to synchronization event</param>
         /// <param name="inputBuffer">buffer for input data</param>
         /// <param name="outputBuffer">buffer for output data</param>
-        public Compressor(EventWaitHandle waitHandle, byte[][] inputBuffer, byte[][] outputBuffer)
+        /// <param name="controller">countroller instance for subscribing to SyncCounterResetEvent</param>
+        public Compressor(EventWaitHandle waitHandle, byte[][] inputBuffer, byte[][] outputBuffer, Controller controller)
         {
             _waitHandle = waitHandle;
             _inputBuffer = inputBuffer;
             _outputBuffer = outputBuffer;
+            controller.SyncCounterResetEvent += ResetSyncCounter;
         }
 
         /// <summary>
@@ -38,13 +41,15 @@ namespace GZipTest
         {
             try
             {
-                using (MemoryStream output = new MemoryStream(_inputBuffer[(int)blockNumber].Length))
+                int blockNum = (int)blockNumber;
+
+                using (MemoryStream output = new MemoryStream(_inputBuffer[blockNum].Length))
                 {
                     using (GZipStream gZipStream = new GZipStream(output, CompressionMode.Compress))
                     {
-                        gZipStream.Write(_inputBuffer[(int)blockNumber], 0, _inputBuffer[(int)blockNumber].Length);
+                        gZipStream.Write(_inputBuffer[blockNum], 0, _inputBuffer[blockNum].Length);
                     }
-                    _outputBuffer[(int)blockNumber] = output.ToArray();
+                    _outputBuffer[blockNum] = output.ToArray();
                 }
                 lock (_waitHandle)
                 {
@@ -67,11 +72,13 @@ namespace GZipTest
         {
             try
             {
-                using (MemoryStream input = new MemoryStream(_inputBuffer[(int)blockNumber]))
+                int blockNum = (int)blockNumber;
+
+                using (MemoryStream input = new MemoryStream(_inputBuffer[blockNum]))
                 {
                     using (var gzipStream = new GZipStream(input, CompressionMode.Decompress))
                     {
-                        gzipStream.Read(_outputBuffer[(int)blockNumber], 0, _outputBuffer[(int)blockNumber].Length);
+                        gzipStream.Read(_outputBuffer[blockNum], 0, _outputBuffer[blockNum].Length);
                     }
                 }
                 lock (_waitHandle)

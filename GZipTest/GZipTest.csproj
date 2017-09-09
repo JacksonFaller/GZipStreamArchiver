@@ -49,6 +49,7 @@
     <Compile Include="Compressor.cs" />
     <Compile Include="Controller.cs" />
     <Compile Include="Exceptions.cs" />
+    <Compile Include="ICompressor.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
