@@ -14,7 +14,7 @@ namespace GZipTest
                 AssemblyName assemblyName = typeof(Program).Assembly.GetName();
                 Console.WriteLine("{0}, Version={1}", assemblyName.Name, assemblyName.Version);
 
-                Log.SetLogger(new ConsoleLogger(true));
+                Log.SetLogger(new ConsoleLogger()); 
                 Controller controller = InitContoller(args);
                 Console.WriteLine("Executing operation...");
                 controller.ExecuteOperation();
@@ -40,10 +40,6 @@ namespace GZipTest
             catch (Exception ex)
             {
                 Log.Error(ex);
-            }
-            finally
-            {
-                Log.DisposeLogger();
             }
         }
 

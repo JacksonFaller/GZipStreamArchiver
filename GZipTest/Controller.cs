@@ -25,7 +25,7 @@ namespace GZipTest
         private ICompressor _compressor;
 
         private string _sourceFile, _targetFile;
-        public enum Operation : byte {  Compress = 1, Decompress = 2 }
+        public enum Operation : byte { Compress, Decompress }
 
         public delegate void SyncEventHandler();
         public event SyncEventHandler SyncCounterResetEvent;

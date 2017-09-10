@@ -31,6 +31,7 @@ namespace GZipTest
             _stream = new StreamWriter(_stringBuilder.ToString(), true);
             _stringBuilder.Clear();
             Resources.GetLogHeader(_stringBuilder);
+            _stream.WriteLine(_stringBuilder.ToString());
             _stringBuilder.Clear();
         }
 

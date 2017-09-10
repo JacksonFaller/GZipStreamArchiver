@@ -29,6 +29,7 @@ namespace GZipTest
             _stream.AutoFlush = autoFlush;
             Resources.GetLogHeader(_stringBuilder);
             _stream.WriteLine(_stringBuilder.ToString());
+            _stringBuilder.Clear();
         }
 
         public ConsoleLogger():this(false)

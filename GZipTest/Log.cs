@@ -30,9 +30,12 @@ namespace GZipTest
     public static class Log
     {
         private static ILogger _logger;
-        private static bool _disposed = false;
-
         private static object _lock = new object();
+
+        static Log()
+        {
+            AppDomain.CurrentDomain.ProcessExit += DisposeLogger;
+        }
         public static void SetLogger<T>(T logger) where T: ILogger, IDisposable
         {
             _logger = logger;
@@ -61,15 +64,9 @@ namespace GZipTest
                 _logger.Warning(message, values);
             }
         }
-        public static void DisposeLogger()
+        private static void DisposeLogger(object sender, EventArgs e)
         {
-            lock (_lock)
-            {
-                if (_disposed) return;
-
-                ((IDisposable)_logger).Dispose();
-                _disposed = true;
-            }
+            ((IDisposable)_logger).Dispose();
         }
     }
 }
