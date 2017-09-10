@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Veeam.Common
+namespace GZipTest
 {
     /// <summary>
     /// Log information to the text file
@@ -17,6 +17,10 @@ namespace Veeam.Common
         private StringBuilder _stringBuilder;
         private readonly int capacity = 128;
         private bool _disposed = false;
+        /// <summary>
+        /// Open file stream and write header
+        /// </summary>
+        /// <param name="filePath">path to the log file</param>
         public FileLogger(string filePath)
         {
             if (filePath == null) filePath = Resources.FilePath;
@@ -36,10 +40,10 @@ namespace Veeam.Common
 
         public void Error(Exception ex)
         {
-            _stringBuilder.AppendFormat("{0} ThreadID: {1} Error {2}", 
-                DateTime.Now, Thread.CurrentThread.ManagedThreadId, ex.Message);
+            _stringBuilder.AppendFormat("{0} ThreadID: {1}; Error: {2}",
+                DateTime.Now, Thread.CurrentThread.ManagedThreadId, ex.GetType().FullName);
             _stream.WriteLine(_stringBuilder.ToString());
-            _stringBuilder.Clear();
+            _stringBuilder.Clear(); 
         }
 
         public void WriteLine(string message, params object[] values)
@@ -69,7 +73,7 @@ namespace Veeam.Common
             if (disposing)
             {
                 // Free any other managed objects here.
-                _stream.Close();
+                _stream.Dispose();
             }
             // Free any unmanaged objects here.
             _disposed = true;

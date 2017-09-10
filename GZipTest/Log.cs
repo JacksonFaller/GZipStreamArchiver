@@ -7,7 +7,7 @@ using System.IO;
 using System.Threading;
 using System.Reflection;
 
-namespace Veeam.Common
+namespace GZipTest
 {
     public static class Resources
     {
@@ -29,19 +29,20 @@ namespace Veeam.Common
     
     public static class Log
     {
-        static ILogger Logger;
+        private static ILogger _logger;
+        private static bool _disposed = false;
 
         private static object _lock = new object();
-        public static void SetLogger(ILogger logger)
+        public static void SetLogger<T>(T logger) where T: ILogger, IDisposable
         {
-            Logger = logger;
+            _logger = logger;
         }
 
         public static void WriteLine (string message, params object[] values)
         {
             lock (_lock)
             {
-                Logger.WriteLine(message, values);
+                _logger.WriteLine(message, values);
             }
         }
 
@@ -49,7 +50,7 @@ namespace Veeam.Common
         {
             lock (_lock)
             {
-                Logger.Error(ex);
+                _logger.Error(ex);
             }
         }
 
@@ -57,7 +58,17 @@ namespace Veeam.Common
         {
             lock (_lock)
             {
-                Logger.Warning(message, values);
+                _logger.Warning(message, values);
+            }
+        }
+        public static void DisposeLogger()
+        {
+            lock (_lock)
+            {
+                if (_disposed) return;
+
+                ((IDisposable)_logger).Dispose();
+                _disposed = true;
             }
         }
     }

@@ -14,6 +14,7 @@ namespace GZipTest
                 AssemblyName assemblyName = typeof(Program).Assembly.GetName();
                 Console.WriteLine("{0}, Version={1}", assemblyName.Name, assemblyName.Version);
 
+                Log.SetLogger(new ConsoleLogger(true));
                 Controller controller = InitContoller(args);
                 Console.WriteLine("Executing operation...");
                 controller.ExecuteOperation();
@@ -23,23 +24,26 @@ namespace GZipTest
             }
             catch (InvalidModeException ex)
             {
-                Console.WriteLine(ex.GetType().FullName);
+                Log.Error(ex);
                 Console.WriteLine(ex.Message);
             }
             catch(MissingParametersException ex)
             {
-                Console.WriteLine(ex.GetType().FullName);
+                Log.Error(ex);
                 Console.WriteLine("{0}\n{1}", ex.Message, ex.Usage);
             }
             catch (InvalidFormatException ex)
             {
-                Console.WriteLine(ex.GetType().FullName);
+                Log.Error(ex);
                 Console.WriteLine(ex.Message);
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.GetType().FullName);
-                Console.WriteLine(ex.Message);
+                Log.Error(ex);
+            }
+            finally
+            {
+                Log.DisposeLogger();
             }
         }
 
@@ -56,21 +60,27 @@ namespace GZipTest
             else
             {
                 Controller.Operation operation;
-                Enum.TryParse(args[0], true, out operation);
-
-                if(operation != 0)
+                if (args[0].Equals(Controller.Operation.Compress.ToString(), StringComparison.OrdinalIgnoreCase))
                 {
-                    byte[][] inputBuffer = new byte[_threadNumber][];
-                    byte[][] outputBuffer = new byte[_threadNumber][];
-                    EventWaitHandle waitHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
-                    Compressor compressor = new Compressor(waitHandle, inputBuffer, outputBuffer);
-                    Controller controller = new Controller(operation, args[1], args[2], _threadNumber, 
-                        inputBuffer, outputBuffer, compressor, waitHandle);
-                    compressor.SubscribeToSyncCounterResetEvent(controller);
-
-                    return controller;
+                    operation = Controller.Operation.Compress;
                 }
-                else throw new InvalidModeException(); // Mode is not compress / decompress
+                else
+                {
+                    if (args[0].Equals(Controller.Operation.Decompress.ToString(), StringComparison.OrdinalIgnoreCase))
+                        operation = Controller.Operation.Compress;
+                    else
+                        throw new InvalidModeException(); // Mode is not compress / decompress
+                }
+
+                byte[][] inputBuffer = new byte[_threadNumber][];
+                byte[][] outputBuffer = new byte[_threadNumber][];
+                EventWaitHandle waitHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
+                Compressor compressor = new Compressor(waitHandle, inputBuffer, outputBuffer);
+                Controller controller = new Controller(operation, args[1], args[2], _threadNumber, 
+                    inputBuffer, outputBuffer, compressor, waitHandle);
+                compressor.SubscribeToSyncCounterResetEvent(controller);
+
+                return controller;
             }
         }
     }

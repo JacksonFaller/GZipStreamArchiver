@@ -63,8 +63,7 @@ namespace GZipTest
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.GetType().FullName);
-                Console.WriteLine(ex.Message);
+                Log.Error(ex);
             }
         }
 
@@ -93,8 +92,7 @@ namespace GZipTest
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.GetType().FullName);
-                Console.WriteLine(ex.Message);
+                Log.Error(ex);
             }
         }
     }
