@@ -5,6 +5,7 @@ namespace GZipTest
     /// <summary>
     /// The exception that is thrown when mode parameter is invalid (not compress / decompress)
     /// </summary>
+    [Serializable]
     class InvalidModeException : Exception
     {
         public new readonly string Message = "Mode parameter should be 'compress' or 'decompress'";
@@ -13,6 +14,7 @@ namespace GZipTest
     /// <summary>
     /// The exception that is thrown when one or more parameter were not set
     /// </summary>
+    [Serializable]
     class MissingParametersException : Exception
     {
         public new readonly string Message = "All parameters should be set";
@@ -22,6 +24,7 @@ namespace GZipTest
     /// <summary>
     /// The exception that is thrown when input archive has invalid format (not GZip)
     /// </summary>
+    [Serializable]
     class InvalidFormatException : Exception
     {
         public new readonly string Message = "Input archive file should be GZip format";

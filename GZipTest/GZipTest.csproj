@@ -47,9 +47,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Compressor.cs" />
+    <Compile Include="ConsoleLogger.cs" />
     <Compile Include="Controller.cs" />
     <Compile Include="Exceptions.cs" />
+    <Compile Include="FileLogger.cs" />
     <Compile Include="ICompressor.cs" />
+    <Compile Include="ILogger.cs" />
+    <Compile Include="Log.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace GZipTest
 {
-    interface ICompressor
+    public interface ICompressor
     {
         void CompressBlock(object blockNumber);
         void DecompressBlock(object blockNumber);

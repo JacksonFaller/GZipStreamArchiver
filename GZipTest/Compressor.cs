@@ -25,11 +25,15 @@ namespace GZipTest
         /// <param name="inputBuffer">buffer for input data</param>
         /// <param name="outputBuffer">buffer for output data</param>
         /// <param name="controller">countroller instance for subscribing to SyncCounterResetEvent</param>
-        public Compressor(EventWaitHandle waitHandle, byte[][] inputBuffer, byte[][] outputBuffer, Controller controller)
+        public Compressor(EventWaitHandle waitHandle, byte[][] inputBuffer, byte[][] outputBuffer)
         {
             _waitHandle = waitHandle;
             _inputBuffer = inputBuffer;
             _outputBuffer = outputBuffer;
+        }
+
+        public void SubscribeToSyncCounterResetEvent(Controller controller)
+        {
             controller.SyncCounterResetEvent += ResetSyncCounter;
         }
 

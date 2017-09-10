@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Reflection;
+using System.Threading;
 
 namespace GZipTest
 {
     class Program
     {
+        private static readonly int _threadNumber = 10;
         static void Main(string[] args)
         {
             try
@@ -53,18 +55,22 @@ namespace GZipTest
             }
             else
             {
-                if (args[0].Equals(Controller.Operation.Compress.ToString(), StringComparison.OrdinalIgnoreCase))
+                Controller.Operation operation;
+                Enum.TryParse(args[0], true, out operation);
+
+                if(operation != 0)
                 {
-                    return new Controller(Controller.Operation.Compress, args[1], args[2]);
+                    byte[][] inputBuffer = new byte[_threadNumber][];
+                    byte[][] outputBuffer = new byte[_threadNumber][];
+                    EventWaitHandle waitHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
+                    Compressor compressor = new Compressor(waitHandle, inputBuffer, outputBuffer);
+                    Controller controller = new Controller(operation, args[1], args[2], _threadNumber, 
+                        inputBuffer, outputBuffer, compressor, waitHandle);
+                    compressor.SubscribeToSyncCounterResetEvent(controller);
+
+                    return controller;
                 }
-                else
-                {
-                    if (args[0].Equals(Controller.Operation.Decompress.ToString(), StringComparison.OrdinalIgnoreCase))
-                    {
-                        return new Controller(Controller.Operation.Decompress, args[1], args[2]);
-                    }
-                    else throw new InvalidModeException(); // Mode is not compress / decompress
-                }
+                else throw new InvalidModeException(); // Mode is not compress / decompress
             }
         }
     }

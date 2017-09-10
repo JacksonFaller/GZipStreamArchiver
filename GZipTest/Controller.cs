@@ -1,5 +1,4 @@
-﻿#define DEBUG
-using System;
+﻿using System;
 using System.IO;
 using System.Threading;
 
@@ -10,8 +9,8 @@ namespace GZipTest
     /// </summary>
     public class Controller
     {
-        public static readonly int ThreadNumber = 10;
-        public static readonly int BufferSize = 1024 * 1024;
+        public readonly int ThreadNumber = 10;
+        public readonly int BufferSize = 1024 * 1024;
 
         private byte[][] _inputBuffer;
         private byte[][] _outputBuffer;
@@ -19,14 +18,14 @@ namespace GZipTest
         public static int ThreadCount
         { get; private set; }
 
-        private EventWaitHandle _waitHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
+        private EventWaitHandle _waitHandle;
 
         private readonly Operation _targetOperation;
 
         private ICompressor _compressor;
 
         private string _sourceFile, _targetFile;
-        public enum Operation { Compress, Decompress }
+        public enum Operation {  Compress = 1, Decompress = 2 }
 
         public delegate void SyncEventHandler();
         public event SyncEventHandler SyncCounterResetEvent;
@@ -38,10 +37,13 @@ namespace GZipTest
         /// <param name="targetOperation">comress/decompress operation to execute</param>
         /// <param name="sourceFile">file name with source data (input)</param>
         /// <param name="targetFile">file name with target data (output)</param>
-        public Controller(Operation targetOperation, string sourceFile, string targetFile)
+        public Controller(Operation targetOperation, string sourceFile, string targetFile, int threadNumber,
+            byte[][] inputBuffer, byte[][] outputBuffer, ICompressor compressor, EventWaitHandle waitHandle)
         {
+            ThreadNumber = threadNumber;
             _targetOperation = targetOperation;
             _sourceFile = sourceFile;
+            _waitHandle = waitHandle;
             if (targetOperation == Operation.Compress)
             {
                 _targetFile = Path.ChangeExtension(targetFile, Path.GetExtension(sourceFile) + ".gz");
@@ -51,9 +53,9 @@ namespace GZipTest
                 _targetFile = Path.GetFileNameWithoutExtension(targetFile) + 
                     Path.GetExtension(Path.GetFileNameWithoutExtension(sourceFile));
             }
-            _inputBuffer = new byte[ThreadNumber][];
-            _outputBuffer = new byte[ThreadNumber][];
-            _compressor = new Compressor(_waitHandle, _inputBuffer, _outputBuffer, this);
+            _inputBuffer = inputBuffer;
+            _outputBuffer = outputBuffer;
+            _compressor = compressor;
             ThreadCount = ThreadNumber;
         }
 
@@ -68,13 +70,7 @@ namespace GZipTest
                 {
                     if (_targetOperation == Operation.Compress)
                     {
-                        while (inputStream.Position < inputStream.Length)
-                        {
-                            OnSyncCounterReset(); // Invoke SyncCounterResetEvent
-                            ReadAndInvokeCompress(inputStream);
-                            _waitHandle.WaitOne();
-                            Write(outputStream);
-                        }
+                            ReadAndInvokeCompress(inputStream, outputStream);
                     }
                     else // target opeartion - decompress
                     {
@@ -88,26 +84,33 @@ namespace GZipTest
         /// <summary>
         /// Read from the source file to the buffer and invoke CompressBlock method in a new thread
         /// </summary>
-        void ReadAndInvokeCompress(FileStream inputStream)
+        void ReadAndInvokeCompress(FileStream inputStream, FileStream outputStream)
         {
             int dataSize;
 
-            for (int blockCounter = 0;
-                (blockCounter < ThreadNumber) && (inputStream.Position < inputStream.Length);
-                blockCounter++)
+            while (inputStream.Position < inputStream.Length)
             {
-                if (inputStream.Length - inputStream.Position <= BufferSize)
+                OnSyncCounterReset(); // Invoke SyncCounterResetEvent
+
+                for (int blockCounter = 0;
+                    (blockCounter < ThreadNumber) && (inputStream.Position < inputStream.Length);
+                    blockCounter++)
                 {
-                    dataSize = (int)(inputStream.Length - inputStream.Position);
-                    ThreadCount = blockCounter + 1;
+                    if (inputStream.Length - inputStream.Position <= BufferSize)
+                    {
+                        dataSize = (int)(inputStream.Length - inputStream.Position);
+                        ThreadCount = blockCounter + 1;
+                    }
+                    else
+                    {
+                        dataSize = BufferSize;
+                    }
+                    _inputBuffer[blockCounter] = new byte[dataSize];
+                    inputStream.Read(_inputBuffer[blockCounter], 0, dataSize);
+                    new Thread(_compressor.CompressBlock).Start(blockCounter);
                 }
-                else
-                {
-                    dataSize = BufferSize;
-                }
-                _inputBuffer[blockCounter] = new byte[dataSize];
-                inputStream.Read(_inputBuffer[blockCounter], 0, dataSize);
-                new Thread(_compressor.CompressBlock).Start(blockCounter);
+                _waitHandle.WaitOne();
+                Write(outputStream);
             }
         }
 
@@ -118,7 +121,7 @@ namespace GZipTest
         /// <param name="outputStream">target file stream</param>
         void ReadAndInvokeDecompress(FileStream inputStream, FileStream outputStream)
         {
-            int searchPos, checkSum, bytesReaded, blockPosition, blockNum;
+            int searchPos, checkSum, bytesReaded, blockPosition;
             int blockCounter = 0, offset = 3, additionalBytes = 375;
             byte[] dataBuffer = new byte[BufferSize + additionalBytes];
 
