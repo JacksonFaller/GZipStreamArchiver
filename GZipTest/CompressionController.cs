@@ -1,31 +1,26 @@
-﻿using System;
+﻿using GZipTest.Exceptions;
+using System;
 using System.IO;
 using System.Threading;
 
 namespace GZipTest
-{   
+{
     /// <summary>
     /// Controls read, compress/decompress and write operations
     /// </summary>
-    public class Controller
+    public partial class CompressionController : ICompressionController
     {
+        public static int ThreadCount { get; private set; }
+
         public readonly int ThreadNumber = 10;
         public readonly int BufferSize = 1024 * 1024;
 
-        private byte[][] _inputBuffer;
-        private byte[][] _outputBuffer;
+        private readonly byte[][] _inputBuffer;
+        private readonly byte[][] _outputBuffer;
 
-        public static int ThreadCount
-        { get; private set; }
+        private readonly ICompressor _compressor;
 
-        private EventWaitHandle _waitHandle;
-
-        private readonly Operation _targetOperation;
-
-        private ICompressor _compressor;
-
-        private string _sourceFile, _targetFile;
-        public enum Operation : byte { Compress, Decompress }
+        private readonly EventWaitHandle _waitHandle;
 
         public delegate void SyncEventHandler();
         public event SyncEventHandler SyncCounterResetEvent;
@@ -37,22 +32,11 @@ namespace GZipTest
         /// <param name="targetOperation">comress/decompress operation to execute</param>
         /// <param name="sourceFile">file name with source data (input)</param>
         /// <param name="targetFile">file name with target data (output)</param>
-        public Controller(Operation targetOperation, string sourceFile, string targetFile, int threadNumber,
-            byte[][] inputBuffer, byte[][] outputBuffer, ICompressor compressor, EventWaitHandle waitHandle)
+        public CompressionController(int threadNumber, byte[][] inputBuffer, byte[][] outputBuffer,
+            ICompressor compressor, EventWaitHandle waitHandle)
         {
             ThreadNumber = threadNumber;
-            _targetOperation = targetOperation;
-            _sourceFile = sourceFile;
             _waitHandle = waitHandle;
-            if (targetOperation == Operation.Compress)
-            {
-                _targetFile = Path.ChangeExtension(targetFile, Path.GetExtension(sourceFile) + ".gz");
-            }
-            else
-            {
-                _targetFile = Path.GetFileNameWithoutExtension(targetFile) + 
-                    Path.GetExtension(Path.GetFileNameWithoutExtension(sourceFile));
-            }
             _inputBuffer = inputBuffer;
             _outputBuffer = outputBuffer;
             _compressor = compressor;
@@ -60,31 +44,9 @@ namespace GZipTest
         }
 
         /// <summary>
-        /// Execute compress / decompress operation in accordance with the startup parameters
-        /// </summary>
-        public void ExecuteOperation()
-        {
-            using (var inputStream = new FileStream(_sourceFile, FileMode.Open, FileAccess.Read))
-            {
-                using (var outputStream = new FileStream(_targetFile, FileMode.Create, FileAccess.Write))
-                {
-                    if (_targetOperation == Operation.Compress)
-                    {
-                            ReadAndInvokeCompress(inputStream, outputStream);
-                    }
-                    else // target opeartion - decompress
-                    {
-                        ValidateArchive(inputStream);
-                        ReadAndInvokeDecompress(inputStream, outputStream);
-                    }
-                }
-            }
-        }
-
-        /// <summary>
         /// Read from the source file to the buffer and invoke CompressBlock method in a new thread
         /// </summary>
-        void ReadAndInvokeCompress(FileStream inputStream, FileStream outputStream)
+        public void ReadAndInvokeCompress(Stream inputStream, Stream outputStream)
         {
             int dataSize;
 
@@ -119,17 +81,17 @@ namespace GZipTest
         /// </summary>
         /// <param name="inputStream">source file stream</param>
         /// <param name="outputStream">target file stream</param>
-        void ReadAndInvokeDecompress(FileStream inputStream, FileStream outputStream)
+        public void ReadAndInvokeDecompress(Stream inputStream, Stream outputStream)
         {
             int searchPos, checkSum, bytesReaded, blockPosition;
             int blockCounter = 0, offset = 3, additionalBytes = 375;
             byte[] dataBuffer = new byte[BufferSize + additionalBytes];
 
-            for (;;)
+            for (; ; )
             {
                 bytesReaded = inputStream.Read(dataBuffer, 0, dataBuffer.Length);
                 blockPosition = 0;
-                
+
                 for (searchPos = offset; searchPos < bytesReaded - 2; searchPos++)
                 {
                     // 0x1f and  0x8b is "Magic numbers" that describe / identify GZIP compression
@@ -138,7 +100,7 @@ namespace GZipTest
                     {
                         // input size of uncompressed data (4 bytes)
                         checkSum = BitConverter.ToInt32(dataBuffer, searchPos - 4);
-                        if (checkSum == BufferSize) 
+                        if (checkSum == BufferSize)
                         {
                             _inputBuffer[blockCounter] = new byte[searchPos - blockPosition];
                             Buffer.BlockCopy(dataBuffer, blockPosition, _inputBuffer[blockCounter], 0, searchPos - blockPosition);
@@ -160,7 +122,7 @@ namespace GZipTest
                 }
                 // All data was readed from stream, copy last block to the buffer, decompress it
                 // and write the rest decompressed blocks to the file
-                if (bytesReaded < dataBuffer.Length) 
+                if (bytesReaded < dataBuffer.Length)
                 {
                     _inputBuffer[blockCounter] = new byte[bytesReaded - blockPosition];
                     Buffer.BlockCopy(dataBuffer, blockPosition, _inputBuffer[blockCounter], 0, bytesReaded - blockPosition);
@@ -174,8 +136,8 @@ namespace GZipTest
                     Write(outputStream);
                     break;
                 }
-                offset = searchPos - blockPosition + 1; 
-                inputStream.Position = inputStream.Position - (bytesReaded - blockPosition);
+                offset = searchPos - blockPosition + 1;
+                inputStream.Position -= (bytesReaded - blockPosition);
             }
         }
 
@@ -183,7 +145,7 @@ namespace GZipTest
         /// Check is this file a GZip archive
         /// </summary>
         /// <param name="inputStream">source file stream</param>
-        void ValidateArchive(FileStream inputStream)
+        public void ValidateArchive(Stream inputStream)
         {
             byte[] dataBuffer = new byte[3];
             inputStream.Read(dataBuffer, 0, dataBuffer.Length);
@@ -201,7 +163,7 @@ namespace GZipTest
         /// Write compressed / decompressed data from the buffer to the target file
         /// </summary>
         /// <param name="outputStream">target file stream to write</param>
-        void Write(FileStream outputStream)
+        private void Write(Stream outputStream)
         {
             for (int i = 0; i < ThreadCount; i++)
             {

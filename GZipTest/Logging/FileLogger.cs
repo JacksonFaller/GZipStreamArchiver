@@ -23,19 +23,19 @@ namespace GZipTest
         /// <param name="filePath">path to the log file</param>
         public FileLogger(string filePath)
         {
-            if (filePath == null) filePath = Resources.FilePath;
+            if (filePath == null) filePath = LogResources.FilePath;
             Directory.CreateDirectory(filePath);
             _stringBuilder = new StringBuilder(capacity);
 
-            _stringBuilder.AppendFormat("{0}{1}.{2}.log", filePath, Resources.AssemblyName, DateTime.Now.ToString(Resources.Format));
+            _stringBuilder.AppendFormat("{0}{1}.{2}.log", filePath, LogResources.AssemblyName, DateTime.Now.ToString(LogResources.Format));
             _stream = new StreamWriter(_stringBuilder.ToString(), true);
             _stringBuilder.Clear();
-            Resources.GetLogHeader(_stringBuilder);
+            LogResources.GetLogHeader(_stringBuilder);
             _stream.WriteLine(_stringBuilder.ToString());
             _stringBuilder.Clear();
         }
 
-        public FileLogger() : this(Resources.FilePath)
+        public FileLogger() : this(LogResources.FilePath)
         {
         }
 

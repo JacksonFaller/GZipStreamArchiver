@@ -1,23 +1,28 @@
-﻿using System;
+﻿using GZipTest.Exceptions;
+using System;
 using System.Reflection;
 using System.Threading;
 
 namespace GZipTest
 {
-    class Program
+    public class Program
     {
         private static readonly int _threadNumber = 10;
-        static void Main(string[] args)
+
+        public static void Main(string[] args)
         {
             try
             {
                 AssemblyName assemblyName = typeof(Program).Assembly.GetName();
                 Console.WriteLine("{0}, Version={1}", assemblyName.Name, assemblyName.Version);
 
-                Log.SetLogger(new ConsoleLogger()); 
-                Controller controller = InitContoller(args);
+                Log.SetLogger(new ConsoleLogger());
+                InputParameters inputParams = InputParameters.CreateFromArgs(args);
+                ICompressionController controller = InitController(inputParams);
+                
                 Console.WriteLine("Executing operation...");
-                controller.ExecuteOperation();
+
+                Execute(inputParams, controller);
 
                 Console.WriteLine("Done!");
                 Console.Read();
@@ -40,45 +45,35 @@ namespace GZipTest
             catch (Exception ex)
             {
                 Log.Error(ex);
+                Console.WriteLine("Unexpected error occured");
             }
-            Console.Read():
         }
 
-        /// <summary>
-        /// Validate parameters and creates Controller and set compress/decompress mode
-        /// </summary>
-        /// <param name="args">programm arguments, contains: [mode] [input file] [output file]</param>
-        private static Controller InitContoller(string[] args)
+        private static void Execute(InputParameters inputParams, ICompressionController controller)
         {
-            if (args.Length < 3)
+            using (IStreamCreator streamCreator = new StreamCreator(inputParams.SourceFile, inputParams.TargetFile))
             {
-                throw new MissingParametersException();
-            }
-            else
-            {
-                Controller.Operation operation;
-                if (args[0].Equals(Controller.Operation.Compress.ToString(), StringComparison.OrdinalIgnoreCase))
+                if (inputParams.Operation == Operation.Compress)
                 {
-                    operation = Controller.Operation.Compress;
+                    controller.ReadAndInvokeCompress(streamCreator.Source, streamCreator.Target);
                 }
-                else
+                else // target opeartion = decompress
                 {
-                    if (args[0].Equals(Controller.Operation.Decompress.ToString(), StringComparison.OrdinalIgnoreCase))
-                        operation = Controller.Operation.Decompress;
-                    else
-                        throw new InvalidModeException(); // Mode is not compress / decompress
+                    controller.ValidateArchive(streamCreator.Source);
+                    controller.ReadAndInvokeDecompress(streamCreator.Source, streamCreator.Target);
                 }
-
-                byte[][] inputBuffer = new byte[_threadNumber][];
-                byte[][] outputBuffer = new byte[_threadNumber][];
-                EventWaitHandle waitHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
-                Compressor compressor = new Compressor(waitHandle, inputBuffer, outputBuffer);
-                Controller controller = new Controller(operation, args[1], args[2], _threadNumber, 
-                    inputBuffer, outputBuffer, compressor, waitHandle);
-                compressor.SubscribeToSyncCounterResetEvent(controller);
-
-                return controller;
             }
+        }
+
+        private static ICompressionController InitController(InputParameters parameters)
+        {
+            byte[][] inputBuffer = new byte[_threadNumber][];
+            byte[][] outputBuffer = new byte[_threadNumber][];
+            EventWaitHandle waitHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
+            Compressor compressor = new Compressor(waitHandle, inputBuffer, outputBuffer);
+            CompressionController controller = new CompressionController(_threadNumber, inputBuffer, outputBuffer, compressor, waitHandle);
+            compressor.SubscribeToSyncCounterResetEvent(controller);
+            return controller;
         }
     }
 }

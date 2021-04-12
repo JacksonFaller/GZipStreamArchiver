@@ -47,15 +47,23 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Compressor.cs" />
-    <Compile Include="ConsoleLogger.cs" />
-    <Compile Include="Controller.cs" />
-    <Compile Include="Exceptions.cs" />
-    <Compile Include="FileLogger.cs" />
-    <Compile Include="ICompressor.cs" />
-    <Compile Include="ILogger.cs" />
-    <Compile Include="Log.cs" />
+    <Compile Include="Logging\ConsoleLogger.cs" />
+    <Compile Include="CompressionController.cs" />
+    <Compile Include="Exceptions\InvalidFormatException.cs" />
+    <Compile Include="Exceptions\InvalidModeException.cs" />
+    <Compile Include="Exceptions\MissingParametersException.cs" />
+    <Compile Include="Logging\FileLogger.cs" />
+    <Compile Include="Interafaces\ICompressor.cs" />
+    <Compile Include="Interafaces\ICompressionController.cs" />
+    <Compile Include="Interafaces\ILogger.cs" />
+    <Compile Include="InputParameters.cs" />
+    <Compile Include="Interafaces\IStreamCreator.cs" />
+    <Compile Include="Logging\Log.cs" />
+    <Compile Include="Enums\Operation.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Logging\LogResources.cs" />
+    <Compile Include="StreamCreator.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

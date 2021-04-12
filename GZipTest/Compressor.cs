@@ -10,10 +10,10 @@ namespace GZipTest
     /// </summary>
     public class Compressor : ICompressor
     {
-        private byte[][] _inputBuffer;
-        private byte[][] _outputBuffer;
+        private readonly byte[][] _inputBuffer;
+        private readonly byte[][] _outputBuffer;
 
-        private EventWaitHandle _waitHandle;    // synchronization event
+        private readonly EventWaitHandle _waitHandle;    // synchronization event
         private int _syncCounter = 0;           // synchronization counter
 
         private void ResetSyncCounter()          // Resets _syncCounter;
@@ -32,7 +32,7 @@ namespace GZipTest
             _outputBuffer = outputBuffer;
         }
 
-        public void SubscribeToSyncCounterResetEvent(Controller controller)
+        public void SubscribeToSyncCounterResetEvent(CompressionController controller)
         {
             controller.SyncCounterResetEvent += ResetSyncCounter;
         }
@@ -58,7 +58,7 @@ namespace GZipTest
                 lock (_waitHandle)
                 {
                     _syncCounter++;
-                    if (_syncCounter == Controller.ThreadCount) _waitHandle.Set();
+                    if (_syncCounter == CompressionController.ThreadCount) _waitHandle.Set();
                 }
             }
             catch (Exception ex)
@@ -87,7 +87,7 @@ namespace GZipTest
                 lock (_waitHandle)
                 {
                     _syncCounter++;
-                    if (_syncCounter == Controller.ThreadCount) _waitHandle.Set();
+                    if (_syncCounter == CompressionController.ThreadCount) _waitHandle.Set();
                 }
             }
             catch (Exception ex)

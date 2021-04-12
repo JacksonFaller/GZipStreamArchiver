@@ -1,10 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace GZipTest
 {
@@ -27,7 +24,7 @@ namespace GZipTest
             _stringBuilder = new StringBuilder(capacity);
             _stream = new StreamWriter(Console.OpenStandardOutput());
             _stream.AutoFlush = autoFlush;
-            Resources.GetLogHeader(_stringBuilder);
+            LogResources.GetLogHeader(_stringBuilder);
             _stream.WriteLine(_stringBuilder.ToString());
             _stringBuilder.Clear();
         }
