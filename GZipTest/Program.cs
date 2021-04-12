@@ -41,6 +41,7 @@ namespace GZipTest
             {
                 Log.Error(ex);
             }
+            Console.Read():
         }
 
         /// <summary>
