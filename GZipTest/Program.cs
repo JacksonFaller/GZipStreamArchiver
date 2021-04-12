@@ -9,7 +9,7 @@ namespace GZipTest
     {
         private static readonly int _threadNumber = 10;
 
-        public static void Main(string[] args)
+        public static int Main(string[] args)
         {
             try
             {
@@ -25,7 +25,7 @@ namespace GZipTest
                 Execute(inputParams, controller);
 
                 Console.WriteLine("Done!");
-                Console.Read();
+                return 1;
             }
             catch (InvalidModeException ex)
             {
@@ -47,6 +47,7 @@ namespace GZipTest
                 Log.Error(ex);
                 Console.WriteLine("Unexpected error occured");
             }
+            return 0;
         }
 
         private static void Execute(InputParameters inputParams, ICompressionController controller)
