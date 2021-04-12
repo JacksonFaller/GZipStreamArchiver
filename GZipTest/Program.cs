@@ -63,7 +63,7 @@ namespace GZipTest
                 else
                 {
                     if (args[0].Equals(Controller.Operation.Decompress.ToString(), StringComparison.OrdinalIgnoreCase))
-                        operation = Controller.Operation.Compress;
+                        operation = Controller.Operation.Decompress;
                     else
                         throw new InvalidModeException(); // Mode is not compress / decompress
                 }
