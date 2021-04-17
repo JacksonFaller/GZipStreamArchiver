@@ -1,11 +1,10 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 
-namespace GZipTest
+namespace GZipTest.Interafaces
 {
-    public interface ICompressionController
+    public interface ICompressionController : IDisposable
     {
-        event CompressionController.SyncEventHandler SyncCounterResetEvent;
-
         void ReadAndInvokeCompress(Stream inputStream, Stream outputStream);
         void ReadAndInvokeDecompress(Stream inputStream, Stream outputStream);
         void ValidateArchive(Stream inputStream);

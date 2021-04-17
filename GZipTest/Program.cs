@@ -1,13 +1,16 @@
 ﻿using GZipTest.Exceptions;
+using GZipTest.Factories;
+using GZipTest.Interafaces;
 using System;
+using System.Configuration;
 using System.Reflection;
-using System.Threading;
 
 namespace GZipTest
 {
     public class Program
     {
-        private static readonly int _threadNumber = 10;
+        private static int _threadNumber;
+        public const string MaxThreads = nameof(MaxThreads);
 
         public static int Main(string[] args)
         {
@@ -15,16 +18,14 @@ namespace GZipTest
             {
                 AssemblyName assemblyName = typeof(Program).Assembly.GetName();
                 Console.WriteLine("{0}, Version={1}", assemblyName.Name, assemblyName.Version);
+                Log.SetLogger(new ConsoleLogger(true));
 
-                Log.SetLogger(new ConsoleLogger());
                 InputParameters inputParams = InputParameters.CreateFromArgs(args);
-                ICompressionController controller = InitController(inputParams);
-                
+                ReadConfig();
                 Console.WriteLine("Executing operation...");
-
-                Execute(inputParams, controller);
-
+                Execute(inputParams);
                 Console.WriteLine("Done!");
+
                 return 1;
             }
             catch (InvalidModeException ex)
@@ -32,7 +33,7 @@ namespace GZipTest
                 Log.Error(ex);
                 Console.WriteLine(ex.Message);
             }
-            catch(MissingParametersException ex)
+            catch (MissingParametersException ex)
             {
                 Log.Error(ex);
                 Console.WriteLine("{0}\n{1}", ex.Message, ex.Usage);
@@ -50,8 +51,9 @@ namespace GZipTest
             return 0;
         }
 
-        private static void Execute(InputParameters inputParams, ICompressionController controller)
+        private static void Execute(InputParameters inputParams)
         {
+            using (ICompressionController controller = InitController())
             using (IStreamCreator streamCreator = new StreamCreator(inputParams.SourceFile, inputParams.TargetFile))
             {
                 if (inputParams.Operation == Operation.Compress)
@@ -66,14 +68,22 @@ namespace GZipTest
             }
         }
 
-        private static ICompressionController InitController(InputParameters parameters)
+        private static void ReadConfig()
         {
-            byte[][] inputBuffer = new byte[_threadNumber][];
-            byte[][] outputBuffer = new byte[_threadNumber][];
-            EventWaitHandle waitHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
-            Compressor compressor = new Compressor(waitHandle, inputBuffer, outputBuffer);
-            CompressionController controller = new CompressionController(_threadNumber, inputBuffer, outputBuffer, compressor, waitHandle);
-            compressor.SubscribeToSyncCounterResetEvent(controller);
+            if (int.TryParse(ConfigurationManager.AppSettings[MaxThreads], out int maxThreads))
+            {
+                _threadNumber = maxThreads;
+            }
+            else
+            {
+                _threadNumber = Environment.ProcessorCount;
+                Console.WriteLine($"Parameter {MaxThreads} is not set in config, using the processor count {_threadNumber}");
+            }
+        }
+
+        private static ICompressionController InitController()
+        {
+            CompressionController controller = new CompressionController(_threadNumber, new CompressorFactory(), new ThreadStorage<int>(_threadNumber));
             return controller;
         }
     }

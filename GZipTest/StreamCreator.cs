@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using GZipTest.Interafaces;
+using System.IO;
 
 namespace GZipTest
 {

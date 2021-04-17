@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace GZipTest
+namespace GZipTest.Interafaces
 {
     public interface ILogger
     {
@@ -12,7 +8,7 @@ namespace GZipTest
         /// Log exception information to the log
         /// </summary>
         /// <param name="ex">exception</param>
-        void Error(Exception ex); 
+        void Error(Exception ex);
 
         /// <summary>
         /// Write formated message to the log
@@ -26,6 +22,6 @@ namespace GZipTest
         /// </summary>
         /// <param name="message">format message</param>
         /// <param name="values">objects to format</param>
-        void Warning(string message, params object[] values); 
+        void Warning(string message, params object[] values);
     }
 }

@@ -37,6 +37,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -47,6 +48,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Compressor.cs" />
+    <Compile Include="Factories\CompressorFactory.cs" />
+    <Compile Include="Interafaces\ICompressorFactory.cs" />
+    <Compile Include="Interafaces\IThreadStorage.cs" />
     <Compile Include="Logging\ConsoleLogger.cs" />
     <Compile Include="CompressionController.cs" />
     <Compile Include="Exceptions\InvalidFormatException.cs" />
@@ -64,9 +68,13 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Logging\LogResources.cs" />
     <Compile Include="StreamCreator.cs" />
+    <Compile Include="ThreadStorage.cs" />
+    <Compile Include="ThreadTask.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="App.config" />
+    <None Include="App.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

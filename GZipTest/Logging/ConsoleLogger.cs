@@ -1,4 +1,5 @@
-﻿using System;
+﻿using GZipTest.Interafaces;
+using System;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -29,9 +30,10 @@ namespace GZipTest
             _stringBuilder.Clear();
         }
 
-        public ConsoleLogger():this(false)
+        public ConsoleLogger() : this(false)
         {
         }
+
         public void Error(Exception ex)
         {
             _stringBuilder.AppendFormat("{0} ThreadID: {1}; Error: {2}",

@@ -1,14 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace GZipTest
+﻿namespace GZipTest.Interafaces
 {
     public interface ICompressor
     {
-        void CompressBlock(object blockNumber);
-        void DecompressBlock(object blockNumber);
+        void CompressBlock(int blockNumber);
+        void DecompressBlock(int blockNumber);
+        void ResetCounter();
+        void SetTarget(int target);
     }
 }

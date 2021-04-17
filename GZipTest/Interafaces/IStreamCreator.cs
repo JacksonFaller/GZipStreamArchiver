@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
 
-namespace GZipTest
+namespace GZipTest.Interafaces
 {
     interface IStreamCreator : IDisposable
     {

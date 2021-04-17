@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using GZipTest.Interafaces;
+using System;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace GZipTest
 {
@@ -44,7 +42,7 @@ namespace GZipTest
             _stringBuilder.AppendFormat("{0} ThreadID: {1}; Error: {2}",
                 DateTime.Now, Thread.CurrentThread.ManagedThreadId, ex.GetType().FullName);
             _stream.WriteLine(_stringBuilder.ToString());
-            _stringBuilder.Clear(); 
+            _stringBuilder.Clear();
         }
 
         public void WriteLine(string message, params object[] values)

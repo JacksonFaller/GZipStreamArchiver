@@ -27,14 +27,14 @@ namespace GZipTest
                     SourceFile = args[1],
                     TargetFile = args[2]
                 };
-                
+
                 return parameters;
             }
         }
 
         public static Operation GetOperation(string operationName)
         {
-            if(Enum.TryParse(operationName, true, out Operation operation))
+            if (Enum.TryParse(operationName, true, out Operation operation))
                 return operation;
 
             throw new InvalidModeException();

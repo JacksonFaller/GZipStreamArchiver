@@ -1,4 +1,5 @@
-﻿using System;
+﻿using GZipTest.Interafaces;
+using System;
 
 namespace GZipTest
 {
@@ -11,12 +12,12 @@ namespace GZipTest
         {
             AppDomain.CurrentDomain.ProcessExit += DisposeLogger;
         }
-        public static void SetLogger<T>(T logger) where T: ILogger, IDisposable
+        public static void SetLogger<T>(T logger) where T : ILogger, IDisposable
         {
             _logger = logger;
         }
 
-        public static void WriteLine (string message, params object[] values)
+        public static void WriteLine(string message, params object[] values)
         {
             lock (_lock)
             {

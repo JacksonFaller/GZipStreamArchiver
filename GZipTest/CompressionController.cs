@@ -1,4 +1,5 @@
 ﻿using GZipTest.Exceptions;
+using GZipTest.Interafaces;
 using System;
 using System.IO;
 using System.Threading;
@@ -10,37 +11,29 @@ namespace GZipTest
     /// </summary>
     public partial class CompressionController : ICompressionController
     {
-        public static int ThreadCount { get; private set; }
-
-        public readonly int ThreadNumber = 10;
+        private readonly int _threadNumber;
+        private readonly IThreadStorage<int> _storage;
         public readonly int BufferSize = 1024 * 1024;
+        public readonly int ExtraBytes = 375;
+        public readonly int BlockSizeHeaderLength = 4;
 
         private readonly byte[][] _inputBuffer;
         private readonly byte[][] _outputBuffer;
 
         private readonly ICompressor _compressor;
-
         private readonly EventWaitHandle _waitHandle;
-
-        public delegate void SyncEventHandler();
-        public event SyncEventHandler SyncCounterResetEvent;
-        private void OnSyncCounterReset()
-        {
-            SyncCounterResetEvent?.Invoke();
-        }
 
         /// <param name="targetOperation">comress/decompress operation to execute</param>
         /// <param name="sourceFile">file name with source data (input)</param>
         /// <param name="targetFile">file name with target data (output)</param>
-        public CompressionController(int threadNumber, byte[][] inputBuffer, byte[][] outputBuffer,
-            ICompressor compressor, EventWaitHandle waitHandle)
+        public CompressionController(int threadNumber, ICompressorFactory compressorFactory, IThreadStorage<int> storage)
         {
-            ThreadNumber = threadNumber;
-            _waitHandle = waitHandle;
-            _inputBuffer = inputBuffer;
-            _outputBuffer = outputBuffer;
-            _compressor = compressor;
-            ThreadCount = ThreadNumber;
+            _threadNumber = threadNumber;
+            _storage = storage;
+            _waitHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
+            _inputBuffer = new byte[threadNumber][];
+            _outputBuffer = new byte[threadNumber][];
+            _compressor = compressorFactory.Make(_waitHandle, _inputBuffer, _outputBuffer);
         }
 
         /// <summary>
@@ -49,30 +42,31 @@ namespace GZipTest
         public void ReadAndInvokeCompress(Stream inputStream, Stream outputStream)
         {
             int dataSize;
-
             while (inputStream.Position < inputStream.Length)
             {
-                OnSyncCounterReset(); // Invoke SyncCounterResetEvent
-
+                ResetCounterAndTarget();
+                int threadCount = _threadNumber;
                 for (int blockCounter = 0;
-                    (blockCounter < ThreadNumber) && (inputStream.Position < inputStream.Length);
+                    (blockCounter < _threadNumber) && (inputStream.Position < inputStream.Length);
                     blockCounter++)
                 {
-                    if (inputStream.Length - inputStream.Position <= BufferSize)
+                    dataSize = (int)(inputStream.Length - inputStream.Position);
+                    if (dataSize <= BufferSize)
                     {
-                        dataSize = (int)(inputStream.Length - inputStream.Position);
-                        ThreadCount = blockCounter + 1;
+                        threadCount = blockCounter + 1;
+                        _compressor.SetTarget(threadCount);
                     }
                     else
                     {
                         dataSize = BufferSize;
                     }
+
                     _inputBuffer[blockCounter] = new byte[dataSize];
                     inputStream.Read(_inputBuffer[blockCounter], 0, dataSize);
-                    new Thread(_compressor.CompressBlock).Start(blockCounter);
+                    _storage.EnqueueTask(new ThreadTask<int>(_compressor.CompressBlock, blockCounter));
                 }
                 _waitHandle.WaitOne();
-                Write(outputStream);
+                Write(outputStream, threadCount);
             }
         }
 
@@ -83,66 +77,47 @@ namespace GZipTest
         /// <param name="outputStream">target file stream</param>
         public void ReadAndInvokeDecompress(Stream inputStream, Stream outputStream)
         {
-            int searchPos, checkSum, bytesReaded, blockPosition;
-            int blockCounter = 0, offset = 3, additionalBytes = 375;
-            byte[] dataBuffer = new byte[BufferSize + additionalBytes];
+            int searchPos, checkSum, bytesRead, blockPosition;
+            int blockCounter = 0, offset = 3;
+            byte[] dataBuffer = new byte[BufferSize + ExtraBytes];
 
+            ResetCounterAndTarget();
             for (; ; )
             {
-                bytesReaded = inputStream.Read(dataBuffer, 0, dataBuffer.Length);
+                bytesRead = inputStream.Read(dataBuffer, 0, dataBuffer.Length);
                 blockPosition = 0;
 
-                for (searchPos = offset; searchPos < bytesReaded - 2; searchPos++)
+                for (searchPos = offset; searchPos < bytesRead - 2; searchPos++)
                 {
-                    // 0x1f and  0x8b is "Magic numbers" that describe / identify GZIP compression
-                    // 0x08 - compression method (Deflate)
-                    if (dataBuffer[searchPos] == 0x1f && dataBuffer[searchPos + 1] == 0x8b && dataBuffer[searchPos + 2] == 0x08)
+                    if (!IsGzipArchive(dataBuffer, searchPos))
+                        continue;
+
+                    checkSum = GetCheckSum(dataBuffer, searchPos);
+                    if (checkSum != BufferSize)
+                        continue;
+
+                    DecompressBlock(dataBuffer, ref blockCounter, ref blockPosition, searchPos);
+                    if (blockCounter == _threadNumber)
                     {
-                        // input size of uncompressed data (4 bytes)
-                        checkSum = BitConverter.ToInt32(dataBuffer, searchPos - 4);
-                        if (checkSum == BufferSize)
-                        {
-                            _inputBuffer[blockCounter] = new byte[searchPos - blockPosition];
-                            Buffer.BlockCopy(dataBuffer, blockPosition, _inputBuffer[blockCounter], 0, searchPos - blockPosition);
-                            blockPosition = searchPos;
-                            _outputBuffer[blockCounter] = new byte[BufferSize];
-
-                            new Thread(_compressor.DecompressBlock).Start(blockCounter); // Invoke Decompress method in a new thread
-                            blockCounter++;
-
-                            if (blockCounter == ThreadNumber) // Check that we have maximum number of theads invoked
-                            {
-                                _waitHandle.WaitOne();
-                                Write(outputStream);
-                                OnSyncCounterReset(); // Invoke SyncCounterResetEvent
-                                blockCounter = 0;
-                            }
-                        }
+                        WaitAndWrite(outputStream, blockCounter);
+                        blockCounter = 0;
+                        ResetCounterAndTarget();
                     }
                 }
-                // All data was readed from stream, copy last block to the buffer, decompress it
-                // and write the rest decompressed blocks to the file
-                if (bytesReaded < dataBuffer.Length)
+                // All data was read from stream
+                if (bytesRead < dataBuffer.Length)
                 {
-                    _inputBuffer[blockCounter] = new byte[bytesReaded - blockPosition];
-                    Buffer.BlockCopy(dataBuffer, blockPosition, _inputBuffer[blockCounter], 0, bytesReaded - blockPosition);
-
-                    checkSum = BitConverter.ToInt32(dataBuffer, bytesReaded - 4);
-                    _outputBuffer[blockCounter] = new byte[checkSum];
-
-                    ThreadCount = blockCounter + 1;
-                    new Thread(_compressor.DecompressBlock).Start(blockCounter); // Invoke decompress method in new thread
-                    _waitHandle.WaitOne(); // Waiting for all threads to complete
-                    Write(outputStream);
+                    DecompressRest(dataBuffer, blockCounter, blockPosition, bytesRead);
+                    WaitAndWrite(outputStream, blockCounter + 1);
                     break;
                 }
                 offset = searchPos - blockPosition + 1;
-                inputStream.Position -= (bytesReaded - blockPosition);
+                inputStream.Position -= (bytesRead - blockPosition);
             }
         }
 
         /// <summary>
-        /// Check is this file a GZip archive
+        /// Check if the file is a GZip archive
         /// </summary>
         /// <param name="inputStream">source file stream</param>
         public void ValidateArchive(Stream inputStream)
@@ -150,22 +125,72 @@ namespace GZipTest
             byte[] dataBuffer = new byte[3];
             inputStream.Read(dataBuffer, 0, dataBuffer.Length);
 
+            if (!IsGzipArchive(dataBuffer, 0)) throw new InvalidFormatException();
+            inputStream.Position = 0; // Reset the stream position
+        }
+
+        public void Dispose()
+        {
+            _storage.Dispose();
+        }
+
+        private void DecompressBlock(byte[] dataBuffer, ref int blockCounter, ref int blockPos, int searchPos)
+        {
+            FillInputBuffer(dataBuffer, blockCounter, blockPos, searchPos - blockPos);
+            blockPos = searchPos;
+            _outputBuffer[blockCounter] = new byte[BufferSize];
+
+            _storage.EnqueueTask(new ThreadTask<int>(_compressor.DecompressBlock, blockCounter));
+            blockCounter++;
+        }
+
+        private void DecompressRest(byte[] dataBuffer, int blockCounter, int blockPos, int bytesRead)
+        {
+            FillInputBuffer(dataBuffer, blockCounter, blockPos, bytesRead - blockPos);
+            int checkSum = GetCheckSum(dataBuffer, bytesRead);
+            _outputBuffer[blockCounter] = new byte[checkSum];
+
+            _compressor.SetTarget(blockCounter + 1);
+            _storage.EnqueueTask(new ThreadTask<int>(_compressor.DecompressBlock, blockCounter));
+        }
+
+        private int GetCheckSum(byte[] dataBuffer, int bytesRead)
+        {
+            return BitConverter.ToInt32(dataBuffer, bytesRead - BlockSizeHeaderLength);
+        }
+
+        private void ResetCounterAndTarget()
+        {
+            _compressor.ResetCounter();
+            _compressor.SetTarget(_threadNumber);
+        }
+
+        private void WaitAndWrite(Stream stream, int blockCount)
+        {
+            _waitHandle.WaitOne();
+            Write(stream, blockCount);
+        }
+
+        private void FillInputBuffer(byte[] dataBuffer, int blockCounter, int blockPosition, int length)
+        {
+            _inputBuffer[blockCounter] = new byte[length];
+            Buffer.BlockCopy(dataBuffer, blockPosition, _inputBuffer[blockCounter], 0, length);
+        }
+
+        private bool IsGzipArchive(byte[] header, int index)
+        {
             // 0x1f and  0x8b is "Magic numbers" that describe / identify GZIP compression
             // 0x08 - compression method (Deflate)
-            if (dataBuffer[0] != 0x1f || dataBuffer[1] != 0x8b || dataBuffer[2] != 0x08)
-            {
-                throw new InvalidFormatException();
-            }
-            inputStream.Position = 0; // Reset the stream position
+            return header[index] == 0x1f && header[index + 1] == 0x8b && header[index + 2] == 0x08;
         }
 
         /// <summary>
         /// Write compressed / decompressed data from the buffer to the target file
         /// </summary>
         /// <param name="outputStream">target file stream to write</param>
-        private void Write(Stream outputStream)
+        private void Write(Stream outputStream, int blockCount)
         {
-            for (int i = 0; i < ThreadCount; i++)
+            for (int i = 0; i < blockCount; i++)
             {
                 outputStream.Write(_outputBuffer[i], 0, _outputBuffer[i].Length);
             }
