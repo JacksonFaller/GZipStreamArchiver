@@ -9,7 +9,7 @@ namespace GZipTest
     {
         private readonly List<Thread> _threads;
         private readonly object _locker = new object();
-        readonly Queue<ThreadTask<T>> _taskQueue = new Queue<ThreadTask<T>>();
+        private readonly Queue<ThreadTask<T>> _taskQueue = new Queue<ThreadTask<T>>();
         private bool _isDisposed = false;
 
         public ThreadStorage(int capacity)

@@ -41,7 +41,7 @@ namespace GZipTest
         /// </summary>
         public void ReadAndInvokeCompress(Stream inputStream, Stream outputStream)
         {
-            int dataSize;
+            long dataSize;
             while (inputStream.Position < inputStream.Length)
             {
                 ResetCounterAndTarget();
@@ -50,11 +50,11 @@ namespace GZipTest
                     (blockCounter < _threadNumber) && (inputStream.Position < inputStream.Length);
                     blockCounter++)
                 {
-                    dataSize = (int)(inputStream.Length - inputStream.Position);
+                    dataSize = inputStream.Length - inputStream.Position;
                     if (dataSize <= BufferSize)
                     {
                         threadCount = blockCounter + 1;
-                        _compressor.SetTarget(threadCount);
+                        _compressor.Target = threadCount;
                     }
                     else
                     {
@@ -62,11 +62,10 @@ namespace GZipTest
                     }
 
                     _inputBuffer[blockCounter] = new byte[dataSize];
-                    inputStream.Read(_inputBuffer[blockCounter], 0, dataSize);
+                    inputStream.Read(_inputBuffer[blockCounter], 0, (int)dataSize);
                     _storage.EnqueueTask(new ThreadTask<int>(_compressor.CompressBlock, blockCounter));
                 }
-                _waitHandle.WaitOne();
-                Write(outputStream, threadCount);
+                WaitAndWrite(outputStream, threadCount);
             }
         }
 
@@ -150,7 +149,7 @@ namespace GZipTest
             int checkSum = GetCheckSum(dataBuffer, bytesRead);
             _outputBuffer[blockCounter] = new byte[checkSum];
 
-            _compressor.SetTarget(blockCounter + 1);
+            _compressor.Target = blockCounter + 1;
             _storage.EnqueueTask(new ThreadTask<int>(_compressor.DecompressBlock, blockCounter));
         }
 
@@ -162,13 +161,20 @@ namespace GZipTest
         private void ResetCounterAndTarget()
         {
             _compressor.ResetCounter();
-            _compressor.SetTarget(_threadNumber);
+            _compressor.Target = _threadNumber;
         }
 
         private void WaitAndWrite(Stream stream, int blockCount)
         {
             _waitHandle.WaitOne();
+            CheckForErrors();
             Write(stream, blockCount);
+        }
+
+        private void CheckForErrors()
+        {
+            if (_compressor.Errors.Count > 0)
+                throw new AggregateException(_compressor.Errors);
         }
 
         private void FillInputBuffer(byte[] dataBuffer, int blockCounter, int blockPosition, int length)

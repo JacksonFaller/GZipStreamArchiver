@@ -1,5 +1,6 @@
 ﻿using GZipTest.Interafaces;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Threading;
@@ -16,7 +17,10 @@ namespace GZipTest
 
         private readonly EventWaitHandle _waitHandle;    // synchronization event
         private int _syncCounter;           // synchronization counter
-        private volatile int _target;
+        private int _target;
+        private readonly object _locker = new object();
+
+        public List<Exception> Errors { get; private set; } = new List<Exception>();
 
         /// <param name="waitHandle">reference to synchronization event</param>
         /// <param name="inputBuffer">buffer for input data</param>
@@ -30,7 +34,12 @@ namespace GZipTest
         }
 
         public void ResetCounter() => _syncCounter = 0;
-        public void SetTarget(int target) => _target = target;
+
+        public int Target
+        {
+            get { lock (_locker) return _target; }
+            set { lock (_locker) _target = value; }
+        }
 
 
         /// <summary>
@@ -49,11 +58,15 @@ namespace GZipTest
                     }
                     _outputBuffer[blockNumber] = output.ToArray();
                 }
-                IncrementCounter();
             }
             catch (Exception ex)
             {
                 Log.Error(ex);
+                Errors.Add(ex);
+            }
+            finally
+            {
+                IncrementCounter();
             }
         }
 
@@ -72,11 +85,16 @@ namespace GZipTest
                         gzipStream.Read(_outputBuffer[blockNumber], 0, _outputBuffer[blockNumber].Length);
                     }
                 }
-                IncrementCounter();
             }
             catch (Exception ex)
             {
                 Log.Error(ex);
+                                Errors.Add(ex);
+
+            }
+            finally
+            {
+                IncrementCounter();
             }
         }
 
@@ -89,7 +107,7 @@ namespace GZipTest
                 Thread.SpinWait(1);
             }
 
-            if (counter == _target - 1) _waitHandle.Set();
+            if (counter == Target - 1) _waitHandle.Set();
         }
     }
 }
