@@ -89,7 +89,7 @@ namespace GZipTest
             catch (Exception ex)
             {
                 Log.Error(ex);
-                                Errors.Add(ex);
+                Errors.Add(ex);
 
             }
             finally
